@@ -212,7 +212,11 @@ export default function Settings({ loaderData }: Route.ComponentProps) {
       {pendingRefundRequests.length > 0 && (
         <Card className="mt-8 max-w-md">
           <CardHeader>
-            <h2 className="text-lg font-semibold">Pending Refund Requests</h2>
+            <h2 className="text-lg font-semibold">
+              {pendingRefundRequests.length === 1
+                ? "Pending Refund Request"
+                : "Pending Refund Requests"}
+            </h2>
             <p className="text-sm text-muted-foreground">
               {pendingRefundRequests.length === 1
                 ? "One Refund Request is waiting on us."

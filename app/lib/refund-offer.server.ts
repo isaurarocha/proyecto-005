@@ -9,8 +9,6 @@ import { db } from "~/db";
 import {
   coupons,
   lessonProgress,
-  lessons,
-  modules,
   purchases,
   refunds,
   videoWatchEvents,
@@ -22,6 +20,7 @@ import {
   type RefundEligibility,
   type RefundFacts,
 } from "~/lib/refund-policy";
+import { getCourseLessonIds } from "~/lib/course-lessons.server";
 
 type Purchase = typeof purchases.$inferSelect;
 
@@ -38,16 +37,6 @@ function getLatestPurchase(userId: number, courseId: number) {
     .where(and(eq(purchases.userId, userId), eq(purchases.courseId, courseId)))
     .orderBy(sql`${purchases.createdAt} desc`)
     .get();
-}
-
-function getLessonIds(courseId: number): number[] {
-  return db
-    .select({ id: lessons.id })
-    .from(lessons)
-    .innerJoin(modules, eq(lessons.moduleId, modules.id))
-    .where(eq(modules.courseId, courseId))
-    .all()
-    .map((row) => row.id);
 }
 
 // The sum of the furthest point reached in each lesson of the course.
@@ -127,7 +116,7 @@ function hasRefundForCourse(purchase: Purchase) {
 }
 
 function gatherRefundFacts(purchase: Purchase, today: Date): RefundFacts {
-  const lessonIds = getLessonIds(purchase.courseId);
+  const lessonIds = getCourseLessonIds(purchase.courseId);
   const seatCounts = getSeatCounts(purchase.id);
 
   return {

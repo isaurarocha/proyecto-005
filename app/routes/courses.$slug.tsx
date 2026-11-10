@@ -51,6 +51,7 @@ import {
 import { parseFormData } from "~/lib/validation";
 import { MAX_RATING, MIN_RATING } from "~/lib/ratings";
 import { getRefundOffer } from "~/lib/refund-offer.server";
+import { getCourseLessonIds } from "~/lib/course-lessons.server";
 import { StarRating, StarRatingInput } from "~/components/star-rating";
 
 function getCourseBySlug(slug: string) {
@@ -141,24 +142,6 @@ function isUserEnrolled(userId: number, courseId: number) {
     )
     .get();
   return !!enrollment;
-}
-
-function getCourseLessonIds(courseId: number): number[] {
-  const courseModules = db
-    .select({ id: modules.id })
-    .from(modules)
-    .where(eq(modules.courseId, courseId))
-    .all();
-
-  if (courseModules.length === 0) return [];
-
-  const courseLessons = db
-    .select({ id: lessons.id })
-    .from(lessons)
-    .where(or(...courseModules.map((m) => eq(lessons.moduleId, m.id)))!)
-    .all();
-
-  return courseLessons.map((l) => l.id);
 }
 
 function calculateProgress(
@@ -915,7 +898,7 @@ function RequestRefund({
         We will send {formatPrice(offer.amount)} back to the card you paid
         with, once someone has reviewed your Refund Request.{" "}
         {offer.isTeamPurchase
-          ? "Every Seat of this Team Purchase will be cancelled. "
+          ? "The Seats of this Team Purchase will no longer give access. "
           : "You will lose access to this course. "}
         You can ask until{" "}
         {new Date(`${offer.lastDayOfWindow}T00:00:00`).toLocaleDateString()}.

@@ -117,8 +117,7 @@ export function describeRefundIneligibility(reason: RefundIneligibleReason): {
     case "completed-too-much":
       return {
         status: 403,
-        message:
-          "You have completed half or more of this course, so it can no longer be refunded.",
+        message: `You have completed ${REFUND_COMPLETION_LIMIT * 100}% or more of this course, so it can no longer be refunded.`,
       };
   }
 }

@@ -76,19 +76,6 @@ export async function action({ params, request }: Route.ActionArgs) {
     throw data("User not found", { status: 404 });
   }
 
-  const offer = getRefundOffer(currentUserId, course.id);
-
-  if (!offer) {
-    throw data("You have not bought this course.", { status: 403 });
-  }
-
-  if (!offer.eligibility.eligible) {
-    const { status, message } = describeRefundIneligibility(
-      offer.eligibility.reason
-    );
-    throw data(message, { status });
-  }
-
   const formData = await request.formData();
   const parsed = parseFormData(formData, refundRequestSchema);
 
@@ -96,19 +83,38 @@ export async function action({ params, request }: Route.ActionArgs) {
     return data({ errors: parsed.errors }, { status: 400 });
   }
 
-  db.insert(refunds)
-    .values({
-      purchaseId: offer.purchase.id,
-      status: RefundStatus.Requested,
-      reason: parsed.data.reason,
-    })
-    .run();
+  // Judge and record in one transaction, so two requests sent at once cannot
+  // both pass the one-Refund-Request-per-purchase rule.
+  const amount = db.transaction(() => {
+    const offer = getRefundOffer(currentUserId, course.id);
+
+    if (!offer) {
+      throw data("You have not bought this course.", { status: 403 });
+    }
+
+    if (!offer.eligibility.eligible) {
+      const { status, message } = describeRefundIneligibility(
+        offer.eligibility.reason
+      );
+      throw data(message, { status });
+    }
+
+    db.insert(refunds)
+      .values({
+        purchaseId: offer.purchase.id,
+        status: RefundStatus.Requested,
+        reason: parsed.data.reason,
+      })
+      .run();
+
+    return offer.eligibility.amount;
+  });
 
   const email = buildRefundRequestedEmail({
     learnerName: learner.name,
     learnerEmail: learner.email,
     courseTitle: course.title,
-    amount: offer.eligibility.amount,
+    amount,
   });
 
   console.log(`[email] to=${email.to} subject=${email.subject}\n${email.body}`);

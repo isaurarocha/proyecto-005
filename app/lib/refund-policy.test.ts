@@ -212,7 +212,7 @@ describe("refund policy", () => {
       ],
       [
         "completed-too-much",
-        "You have completed half or more of this course, so it can no longer be refunded.",
+        "You have completed 50% or more of this course, so it can no longer be refunded.",
       ],
     ] as const)("refuses %s in plain words", (reason, message) => {
       expect(describeRefundIneligibility(reason)).toEqual({
