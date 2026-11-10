@@ -17,7 +17,7 @@ import {
 } from "~/db/schema";
 import { eq, and } from "drizzle-orm";
 
-function getTeamForAdmin(userId: number) {
+function getTeamForTeamManager(userId: number) {
   const membership = db
     .select()
     .from(teamMembers)
@@ -34,7 +34,7 @@ function getTeamForAdmin(userId: number) {
   return db.select().from(teams).where(eq(teams.id, membership.teamId)).get();
 }
 
-function getCouponsForTeam(teamId: number) {
+function getSeatsForTeam(teamId: number) {
   return db.select().from(coupons).where(eq(coupons.teamId, teamId)).all();
 }
 
@@ -54,19 +54,19 @@ interface CourseStats {
   claimedSeats: number;
 }
 
-interface CouponRow {
+interface SeatRow {
   id: number;
   code: string;
   courseId: number;
   courseTitle: string;
-  redeemedByEmail: string | null;
+  claimedByEmail: string | null;
   createdAt: string;
 }
 
 export function meta() {
   return [
     { title: "Team — Cadence" },
-    { name: "description", content: "Manage your team's course seats" },
+    { name: "description", content: "Hand out your Team's Seats" },
   ];
 }
 
@@ -77,15 +77,18 @@ export async function loader({ request }: Route.LoaderArgs) {
     throw data("Select a user from the DevUI panel.", { status: 401 });
   }
 
-  const team = getTeamForAdmin(currentUserId);
+  const team = getTeamForTeamManager(currentUserId);
 
   if (!team) {
-    throw data("You don't have a team. Purchase team seats to create one.", {
-      status: 403,
-    });
+    throw data(
+      "You don't have a Team yet. Buy Seats in a course to become a Team Manager.",
+      {
+        status: 403,
+      }
+    );
   }
 
-  const allCoupons = getCouponsForTeam(team.id);
+  const allSeats = getSeatsForTeam(team.id);
 
   // Build per-course stats
   const courseMap = new Map<
@@ -99,20 +102,21 @@ export async function loader({ request }: Route.LoaderArgs) {
     }
   >();
 
-  for (const coupon of allCoupons) {
-    if (!courseMap.has(coupon.courseId)) {
-      const course = getCourseById(coupon.courseId);
-      courseMap.set(coupon.courseId, {
-        courseId: coupon.courseId,
+  for (const seat of allSeats) {
+    let entry = courseMap.get(seat.courseId);
+    if (!entry) {
+      const course = getCourseById(seat.courseId);
+      entry = {
+        courseId: seat.courseId,
         courseTitle: course?.title ?? "Unknown Course",
         courseSlug: course?.slug ?? "",
         total: 0,
         claimed: 0,
-      });
+      };
+      courseMap.set(seat.courseId, entry);
     }
-    const entry = courseMap.get(coupon.courseId)!;
     entry.total++;
-    if (coupon.redeemedByUserId !== null) {
+    if (seat.redeemedByUserId !== null) {
       entry.claimed++;
     }
   }
@@ -127,32 +131,32 @@ export async function loader({ request }: Route.LoaderArgs) {
     })
   );
 
-  // Build coupon rows with redeemer email
-  const couponRows: CouponRow[] = allCoupons.map((coupon) => {
-    let redeemedByEmail: string | null = null;
-    if (coupon.redeemedByUserId !== null) {
-      const user = getUserById(coupon.redeemedByUserId);
-      redeemedByEmail = user?.email ?? null;
+  // Build Seat rows with the email of whoever claimed each one
+  const seatRows: SeatRow[] = allSeats.map((seat) => {
+    let claimedByEmail: string | null = null;
+    if (seat.redeemedByUserId !== null) {
+      const user = getUserById(seat.redeemedByUserId);
+      claimedByEmail = user?.email ?? null;
     }
-    const course = getCourseById(coupon.courseId);
+    const course = getCourseById(seat.courseId);
     return {
-      id: coupon.id,
-      code: coupon.code,
-      courseId: coupon.courseId,
+      id: seat.id,
+      code: seat.code,
+      courseId: seat.courseId,
       courseTitle: course?.title ?? "Unknown Course",
-      redeemedByEmail,
-      createdAt: coupon.createdAt,
+      claimedByEmail,
+      createdAt: seat.createdAt,
     };
   });
 
-  return { courseStats, couponRows };
+  return { courseStats, seatRows };
 }
 
-function CopyButton({ code }: { code: string }) {
+function CopySeatLinkButton({ code }: { code: string }) {
   const [copied, setCopied] = useState(false);
 
   function handleCopy() {
-    const url = `${window.location.origin}/redeem/${code}`;
+    const url = `${window.location.origin}/claim/${code}`;
     navigator.clipboard.writeText(url).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
@@ -163,7 +167,7 @@ function CopyButton({ code }: { code: string }) {
     <button
       onClick={handleCopy}
       className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-primary hover:bg-primary/10 transition-colors"
-      title="Copy redemption link"
+      title="Copy Seat Link"
     >
       {copied ? (
         <>
@@ -173,7 +177,7 @@ function CopyButton({ code }: { code: string }) {
       ) : (
         <>
           <Copy className="size-3" />
-          Copy link
+          Copy Seat Link
         </>
       )}
     </button>
@@ -181,13 +185,13 @@ function CopyButton({ code }: { code: string }) {
 }
 
 export default function Team({ loaderData }: Route.ComponentProps) {
-  const { courseStats, couponRows } = loaderData;
+  const { courseStats, seatRows } = loaderData;
   const [courseFilter, setCourseFilter] = useState<number | "all">("all");
 
-  const filteredCoupons =
+  const filteredSeats =
     courseFilter === "all"
-      ? couponRows
-      : couponRows.filter((c) => c.courseId === courseFilter);
+      ? seatRows
+      : seatRows.filter((s) => s.courseId === courseFilter);
 
   return (
     <div className="mx-auto max-w-7xl p-6 lg:p-8">
@@ -200,9 +204,10 @@ export default function Team({ loaderData }: Route.ComponentProps) {
       </nav>
 
       <div className="mb-8">
-        <h1 className="text-3xl font-bold">Team Management</h1>
+        <h1 className="text-3xl font-bold">Team</h1>
         <p className="mt-1 text-muted-foreground">
-          Manage your team&apos;s course seats and coupon codes
+          Hand out your Team&apos;s Seats by sharing a Seat Link with each
+          person
         </p>
       </div>
 
@@ -243,10 +248,10 @@ export default function Team({ loaderData }: Route.ComponentProps) {
         </div>
       )}
 
-      {/* Coupon list */}
+      {/* Seat list */}
       <div>
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Coupons</h2>
+          <h2 className="text-lg font-semibold">Seats</h2>
           {courseStats.length > 1 && (
             <select
               value={courseFilter}
@@ -267,34 +272,34 @@ export default function Team({ loaderData }: Route.ComponentProps) {
           )}
         </div>
 
-        {filteredCoupons.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No coupons yet.</p>
+        {filteredSeats.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No Seats yet.</p>
         ) : (
           <div className="overflow-x-auto rounded-md border">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b bg-muted/50">
-                  <th className="px-4 py-3 text-left font-medium">Code</th>
+                  <th className="px-4 py-3 text-left font-medium">Seat</th>
                   <th className="px-4 py-3 text-left font-medium">Course</th>
                   <th className="px-4 py-3 text-left font-medium">Status</th>
                   <th className="px-4 py-3 text-left font-medium">Action</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredCoupons.map((coupon) => (
-                  <tr key={coupon.id} className="border-b last:border-0">
+                {filteredSeats.map((seat) => (
+                  <tr key={seat.id} className="border-b last:border-0">
                     <td className="px-4 py-3">
                       <code className="rounded bg-muted px-2 py-0.5 text-xs">
-                        {coupon.code}
+                        {seat.code}
                       </code>
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">
-                      {coupon.courseTitle}
+                      {seat.courseTitle}
                     </td>
                     <td className="px-4 py-3">
-                      {coupon.redeemedByEmail ? (
+                      {seat.claimedByEmail ? (
                         <span className="text-muted-foreground">
-                          Claimed by {coupon.redeemedByEmail}
+                          Claimed by {seat.claimedByEmail}
                         </span>
                       ) : (
                         <span className="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
@@ -303,8 +308,8 @@ export default function Team({ loaderData }: Route.ComponentProps) {
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      {!coupon.redeemedByEmail && (
-                        <CopyButton code={coupon.code} />
+                      {!seat.claimedByEmail && (
+                        <CopySeatLinkButton code={seat.code} />
                       )}
                     </td>
                   </tr>
@@ -330,11 +335,11 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
           ? error.data
           : "Please select a user from the DevUI panel.";
     } else if (error.status === 403) {
-      title = "No team found";
+      title = "No Team found";
       message =
         typeof error.data === "string"
           ? error.data
-          : "You don't have a team yet.";
+          : "You don't have a Team yet.";
     } else {
       title = `Error ${error.status}`;
       message = typeof error.data === "string" ? error.data : error.statusText;

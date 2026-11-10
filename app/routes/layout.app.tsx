@@ -27,7 +27,7 @@ function getUserById(id: number) {
   return db.select().from(users).where(eq(users.id, id)).get();
 }
 
-function getTeamForAdmin(userId: number) {
+function getTeamForTeamManager(userId: number) {
   const membership = db
     .select()
     .from(teamMembers)
@@ -44,8 +44,8 @@ function getTeamForAdmin(userId: number) {
   return db.select().from(teams).where(eq(teams.id, membership.teamId)).get();
 }
 
-function isTeamAdmin(userId: number) {
-  return !!getTeamForAdmin(userId);
+function isTeamManager(userId: number) {
+  return !!getTeamForTeamManager(userId);
 }
 
 function getCourseLessonIds(courseId: number): number[] {
@@ -212,7 +212,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     devCountry,
     countryTierInfo,
     countries: COUNTRIES,
-    isTeamAdmin: currentUserId ? isTeamAdmin(currentUserId) : false,
+    isTeamManager: currentUserId ? isTeamManager(currentUserId) : false,
   };
 }
 
@@ -224,7 +224,7 @@ export default function AppLayout({ loaderData }: Route.ComponentProps) {
     devCountry,
     countryTierInfo,
     countries,
-    isTeamAdmin: userIsTeamAdmin,
+    isTeamManager: userIsTeamManager,
   } = loaderData;
 
   return (
@@ -232,7 +232,7 @@ export default function AppLayout({ loaderData }: Route.ComponentProps) {
       <Sidebar
         currentUser={currentUser}
         recentCourses={recentCourses}
-        isTeamAdmin={userIsTeamAdmin}
+        isTeamManager={userIsTeamManager}
       />
       <main className="flex-1 overflow-y-auto">
         <Outlet />
