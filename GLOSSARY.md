@@ -37,6 +37,10 @@ _Avoid_: Coupon, coupon code, licence
 The shareable link a Team Manager sends to someone so they can claim a Seat.
 _Avoid_: Coupon link, coupon code
 
+**Cancelled Seat**:
+A Seat that no longer gives access to anyone because its Team Purchase was refunded. A Cancelled Seat can never be claimed.
+_Avoid_: Refunded Seat, revoked Seat
+
 **Claim**:
 To take a Seat for yourself, which gives you access to its course. A Seat can be claimed once.
 _Avoid_: Redeem, use, mint

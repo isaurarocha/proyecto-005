@@ -3,6 +3,7 @@ import { describeSeatClaimRefusal, judgeSeatClaim } from "./seat-claim";
 
 const claimable = {
   seatCancelled: false,
+  refundPending: false,
   seatClaimed: false,
   alreadyHasAccess: false,
   purchaseCountry: "US",
@@ -12,10 +13,19 @@ const claimable = {
 describe("judgeSeatClaim", () => {
   it("refuses a Seat whose Team Purchase was refunded", () => {
     // Cancelled outranks everything else: nothing about the claimer can
-    // bring back a Seat that was paid back.
+    // bring back a Seat whose Team Purchase was refunded.
     expect(
       judgeSeatClaim({ ...claimable, seatCancelled: true, seatClaimed: true })
     ).toEqual({ claimable: false, reason: "seat-cancelled" });
+  });
+
+  it("refuses a Seat while its Team Purchase has a pending Refund Request", () => {
+    // Claiming now would hand out access the Team Manager is asking to have
+    // refunded.
+    expect(judgeSeatClaim({ ...claimable, refundPending: true })).toEqual({
+      claimable: false,
+      reason: "refund-pending",
+    });
   });
 
   it("refuses a Seat that has already been claimed", () => {

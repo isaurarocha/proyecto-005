@@ -9,7 +9,14 @@ import { Card, CardContent } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { Ticket, AlertCircle, CheckCircle2, Globe } from "lucide-react";
 import { db } from "~/db";
-import { purchases, coupons, courses, enrollments } from "~/db/schema";
+import {
+  purchases,
+  coupons,
+  courses,
+  enrollments,
+  refunds,
+  RefundStatus,
+} from "~/db/schema";
 import { eq, and, isNull } from "drizzle-orm";
 
 // Served at /claim/:code, and at /redeem/:code for Seat Links shared before
@@ -44,6 +51,21 @@ function getPurchaseCountry(purchaseId: number) {
   return purchase?.country ?? null;
 }
 
+function hasPendingRefundRequest(purchaseId: number) {
+  const pending = db
+    .select({ id: refunds.id })
+    .from(refunds)
+    .where(
+      and(
+        eq(refunds.purchaseId, purchaseId),
+        eq(refunds.status, RefundStatus.Requested)
+      )
+    )
+    .get();
+
+  return pending !== undefined;
+}
+
 function judgeClaimFor(
   seat: typeof coupons.$inferSelect,
   userId: number,
@@ -52,6 +74,7 @@ function judgeClaimFor(
   const purchaseCountry = getPurchaseCountry(seat.purchaseId);
   const judgement = judgeSeatClaim({
     seatCancelled: seat.cancelledAt !== null,
+    refundPending: hasPendingRefundRequest(seat.purchaseId),
     seatClaimed: seat.redeemedByUserId !== null,
     alreadyHasAccess: hasAccess(userId, seat.courseId),
     purchaseCountry,
@@ -200,7 +223,8 @@ export default function ClaimSeat({ loaderData }: Route.ComponentProps) {
           </p>
 
           {refusal?.reason === "seat-claimed" ||
-          refusal?.reason === "seat-cancelled" ? (
+          refusal?.reason === "seat-cancelled" ||
+          refusal?.reason === "refund-pending" ? (
             <div className="rounded-lg bg-destructive/10 p-4">
               <div className="flex items-center justify-center gap-2 text-destructive">
                 <AlertCircle className="size-5" />

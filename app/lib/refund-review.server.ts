@@ -57,9 +57,10 @@ function getSeatCounts(purchaseId: number) {
  * 409 if it is no longer pending, so a Refund is never recorded twice.
  *
  * Approving an individual purchase removes the learner's enrollment.
- * Approving a Team Purchase cancels every one of its Seats; if a Seat was
- * claimed while the request was waiting, approval is refused (409), because a
- * Team Purchase cannot be refunded once a Seat is claimed.
+ * Approving a Team Purchase cancels every one of its Seats. Seats cannot be
+ * claimed while a Refund Request is pending, but if one was claimed before
+ * that rule existed, approval is refused (409): a Team Purchase cannot be
+ * refunded once a Seat is claimed.
  */
 export function resolveRefundRequest(
   refundRequestId: number,

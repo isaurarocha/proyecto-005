@@ -7,6 +7,8 @@ import { canClaimSeatFromCountry, countryName } from "./ppp";
 
 export type SeatClaimFacts = {
   seatCancelled: boolean;
+  // The Team Purchase this Seat came from has a Refund Request waiting.
+  refundPending: boolean;
   seatClaimed: boolean;
   alreadyHasAccess: boolean;
   purchaseCountry: string | null;
@@ -15,6 +17,7 @@ export type SeatClaimFacts = {
 
 export type SeatClaimRefusal =
   | "seat-cancelled"
+  | "refund-pending"
   | "seat-claimed"
   | "already-has-access"
   | "wrong-country";
@@ -26,6 +29,10 @@ export type SeatClaimJudgement =
 export function judgeSeatClaim(facts: SeatClaimFacts): SeatClaimJudgement {
   if (facts.seatCancelled) {
     return { claimable: false, reason: "seat-cancelled" };
+  }
+
+  if (facts.refundPending) {
+    return { claimable: false, reason: "refund-pending" };
   }
 
   if (facts.seatClaimed) {
@@ -58,6 +65,13 @@ export function describeSeatClaimRefusal(
         title: "This Seat was cancelled",
         message:
           "The Team Purchase this Seat came from was refunded, so the Seat can no longer be claimed. Ask the Team Manager who sent you this Seat Link.",
+      };
+    case "refund-pending":
+      return {
+        status: 409,
+        title: "This Seat can't be claimed right now",
+        message:
+          "The Team Manager has asked for a Refund of the Team Purchase this Seat came from, so it can't be claimed while that is reviewed. Ask the Team Manager who sent you this Seat Link.",
       };
     case "seat-claimed":
       return {
