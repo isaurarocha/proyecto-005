@@ -219,7 +219,7 @@ function getOrCreateTeamForUser(userId: number) {
   return team;
 }
 
-function generateCoupons(
+function createSeats(
   teamId: number,
   courseId: number,
   purchaseId: number,
@@ -227,7 +227,7 @@ function generateCoupons(
 ) {
   const created: (typeof coupons.$inferSelect)[] = [];
   for (let i = 0; i < quantity; i++) {
-    const coupon = db
+    const seat = db
       .insert(coupons)
       .values({
         teamId,
@@ -237,7 +237,7 @@ function generateCoupons(
       })
       .returning()
       .get();
-    created.push(coupon);
+    created.push(seat);
   }
   return created;
 }
@@ -251,8 +251,8 @@ function createTeamPurchase(
 ) {
   const purchase = createPurchase(userId, courseId, amountPaid, country);
   const team = getOrCreateTeamForUser(userId);
-  const teamCoupons = generateCoupons(team.id, courseId, purchase.id, quantity);
-  return { purchase, team, coupons: teamCoupons };
+  const seats = createSeats(team.id, courseId, purchase.id, quantity);
+  return { purchase, team, seats };
 }
 
 const purchaseParamsSchema = z.object({
@@ -588,9 +588,9 @@ export default function PurchaseConfirmation({
                     </div>
 
                     <p className="text-sm text-muted-foreground">
-                      You&apos;ll receive {quantity} unique coupon{" "}
-                      {quantity === 1 ? "link" : "links"} to share with your
-                      team members. Each link grants one person access to this
+                      You&apos;ll receive {quantity} Seat{" "}
+                      {quantity === 1 ? "Link" : "Links"} to share with your
+                      team. Each Seat Link lets one person claim a Seat in this
                       course.
                     </p>
 
