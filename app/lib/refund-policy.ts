@@ -81,3 +81,44 @@ export function getRefundEligibility(facts: RefundFacts): RefundEligibility {
 
   return { eligible: true, amount: facts.amountPaid, lastDayOfWindow };
 }
+
+// What the refund action answers when a Refund Request is refused.
+export function describeRefundIneligibility(reason: RefundIneligibleReason): {
+  status: number;
+  message: string;
+} {
+  switch (reason) {
+    case "already-requested":
+      return {
+        status: 409,
+        message: "This purchase already has a Refund Request.",
+      };
+    case "already-refunded-for-course":
+      return {
+        status: 403,
+        message: "You have already had a Refund for this course.",
+      };
+    case "window-closed":
+      return {
+        status: 403,
+        message: `The ${REFUND_WINDOW_DAYS}-day Refund Window has closed.`,
+      };
+    case "seat-claimed":
+      return {
+        status: 403,
+        message:
+          "A Team Purchase cannot be refunded once a Seat has been claimed.",
+      };
+    case "watched-too-much":
+      return {
+        status: 403,
+        message: `You have watched ${REFUND_WATCH_LIMIT_SECONDS / 3600} hours or more of this course, so it can no longer be refunded.`,
+      };
+    case "completed-too-much":
+      return {
+        status: 403,
+        message:
+          "You have completed half or more of this course, so it can no longer be refunded.",
+      };
+  }
+}

@@ -3,6 +3,7 @@ import {
   REFUND_COMPLETION_LIMIT,
   REFUND_WATCH_LIMIT_SECONDS,
   REFUND_WINDOW_DAYS,
+  describeRefundIneligibility,
   getRefundEligibility,
   type RefundFacts,
 } from "./refund-policy";
@@ -184,6 +185,40 @@ describe("refund policy", () => {
       expect(
         getRefundEligibility(teamPurchase({ hasRefundRequest: true }))
       ).toEqual({ eligible: false, reason: "already-requested" });
+    });
+  });
+
+  describe("telling the learner why not", () => {
+    it("answers a second Refund Request on the same purchase with a conflict", () => {
+      expect(describeRefundIneligibility("already-requested")).toEqual({
+        status: 409,
+        message: "This purchase already has a Refund Request.",
+      });
+    });
+
+    it.each([
+      [
+        "already-refunded-for-course",
+        "You have already had a Refund for this course.",
+      ],
+      ["window-closed", "The 14-day Refund Window has closed."],
+      [
+        "seat-claimed",
+        "A Team Purchase cannot be refunded once a Seat has been claimed.",
+      ],
+      [
+        "watched-too-much",
+        "You have watched 2 hours or more of this course, so it can no longer be refunded.",
+      ],
+      [
+        "completed-too-much",
+        "You have completed half or more of this course, so it can no longer be refunded.",
+      ],
+    ] as const)("refuses %s in plain words", (reason, message) => {
+      expect(describeRefundIneligibility(reason)).toEqual({
+        status: 403,
+        message,
+      });
     });
   });
 });
