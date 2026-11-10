@@ -190,7 +190,7 @@ function createPurchase(
     .get();
 }
 
-function getTeamForAdmin(userId: number) {
+function getTeamForTeamManager(userId: number) {
   const membership = db
     .select()
     .from(teamMembers)
@@ -208,7 +208,7 @@ function getTeamForAdmin(userId: number) {
 }
 
 function getOrCreateTeamForUser(userId: number) {
-  const existingTeam = getTeamForAdmin(userId);
+  const existingTeam = getTeamForTeamManager(userId);
   if (existingTeam) return existingTeam;
 
   const team = db.insert(teams).values({}).returning().get();
