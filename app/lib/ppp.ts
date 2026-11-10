@@ -76,6 +76,21 @@ export function checkPppAccess(
 }
 
 /**
+ * Whether someone in `claimerCountry` may claim a Seat from a Team Purchase
+ * made in `purchaseCountry`. Only Seats bought at a PPP discount are locked to
+ * the buyer's country; an unknown claimer country does not pass the lock.
+ */
+export function canClaimSeatFromCountry(
+  purchaseCountry: string | null,
+  claimerCountry: string | null
+): boolean {
+  if (!purchaseCountry) return true;
+  if (getDiscountForCountry(purchaseCountry) === 0) return true;
+  if (!claimerCountry) return false;
+  return claimerCountry.toUpperCase() === purchaseCountry.toUpperCase();
+}
+
+/**
  * A country code as a name, falling back to the code itself.
  *
  * A purchase can carry a code this list has never heard of — the code is

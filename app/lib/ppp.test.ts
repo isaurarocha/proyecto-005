@@ -5,6 +5,7 @@ import {
   calculatePppPrice,
   getCountryTierInfo,
   checkPppAccess,
+  canClaimSeatFromCountry,
 } from "./ppp";
 
 describe("PPP Config", () => {
@@ -209,6 +210,38 @@ describe("PPP Config", () => {
         blockedCountry: "US",
         purchaseCountry: "IN",
       });
+    });
+  });
+
+  // ─── Seat country lock ───
+
+  describe("canClaimSeatFromCountry", () => {
+    // A Seat from a PPP-discounted Team Purchase may only be claimed in the
+    // country the discount was given for. Full-price Seats travel freely.
+
+    it("allows a full-price Seat to be claimed from anywhere", () => {
+      expect(canClaimSeatFromCountry("US", "IN")).toBe(true);
+    });
+
+    it("allows a discounted Seat to be claimed from the buyer's country", () => {
+      expect(canClaimSeatFromCountry("IN", "IN")).toBe(true);
+    });
+
+    it("blocks a discounted Seat from being claimed in another country", () => {
+      expect(canClaimSeatFromCountry("IN", "US")).toBe(false);
+    });
+
+    it("blocks a discounted Seat when the claimer's country is unknown", () => {
+      // Unknown is not proof of being in the right country.
+      expect(canClaimSeatFromCountry("IN", null)).toBe(false);
+    });
+
+    it("compares country codes case-insensitively", () => {
+      expect(canClaimSeatFromCountry("in", "IN")).toBe(true);
+    });
+
+    it("allows any Seat when the Team Purchase has no country recorded", () => {
+      expect(canClaimSeatFromCountry(null, "US")).toBe(true);
     });
   });
 });
