@@ -341,7 +341,7 @@ function getTopBuyers(
     .select({
       userId: purchases.userId,
       bought: count(coupons.id),
-      unclaimed: sql<number>`sum(case when ${coupons.redeemedByUserId} is null then 1 else 0 end)`,
+      unclaimed: sql<number>`sum(case when ${coupons.redeemedByUserId} is null and ${coupons.cancelledAt} is null then 1 else 0 end)`,
     })
     .from(coupons)
     .innerJoin(purchases, eq(coupons.purchaseId, purchases.id))

@@ -51,6 +51,7 @@ function judgeClaimFor(
 ) {
   const purchaseCountry = getPurchaseCountry(seat.purchaseId);
   const judgement = judgeSeatClaim({
+    seatCancelled: seat.cancelledAt !== null,
     seatClaimed: seat.redeemedByUserId !== null,
     alreadyHasAccess: hasAccess(userId, seat.courseId),
     purchaseCountry,
@@ -198,7 +199,8 @@ export default function ClaimSeat({ loaderData }: Route.ComponentProps) {
             <code className="rounded bg-muted px-2 py-0.5">{code}</code>
           </p>
 
-          {refusal?.reason === "seat-claimed" ? (
+          {refusal?.reason === "seat-claimed" ||
+          refusal?.reason === "seat-cancelled" ? (
             <div className="rounded-lg bg-destructive/10 p-4">
               <div className="flex items-center justify-center gap-2 text-destructive">
                 <AlertCircle className="size-5" />

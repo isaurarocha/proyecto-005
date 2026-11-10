@@ -3,7 +3,7 @@
 // approving or declining a single one. See GLOSSARY.md for the terms.
 
 import { data } from "react-router";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, count, eq, isNull } from "drizzle-orm";
 import { db } from "~/db";
 import {
   coupons,
@@ -41,12 +41,14 @@ export function getPendingRefundRequests() {
     .all();
 }
 
-function isTeamPurchase(purchaseId: number) {
-  return !!db
-    .select({ id: coupons.id })
+function getSeatCounts(purchaseId: number) {
+  const row = db
+    .select({ seats: count(), claimed: count(coupons.redeemedAt) })
     .from(coupons)
     .where(eq(coupons.purchaseId, purchaseId))
     .get();
+
+  return { seats: row?.seats ?? 0, claimed: row?.claimed ?? 0 };
 }
 
 /**
@@ -54,8 +56,10 @@ function isTeamPurchase(purchaseId: number) {
  * the email to send the learner. Throws 404 if there is no such request and
  * 409 if it is no longer pending, so a Refund is never recorded twice.
  *
- * Approving an individual purchase removes the learner's enrollment. A Team
- * Purchase gave the buyer no enrollment; its Seats are left alone here.
+ * Approving an individual purchase removes the learner's enrollment.
+ * Approving a Team Purchase cancels every one of its Seats; if a Seat was
+ * claimed while the request was waiting, approval is refused (409), because a
+ * Team Purchase cannot be refunded once a Seat is claimed.
  */
 export function resolveRefundRequest(
   refundRequestId: number,
@@ -95,6 +99,16 @@ export function resolveRefundRequest(
     const resolvedAt = now.toISOString();
 
     if (decision === "approve") {
+      const seatCounts = getSeatCounts(request.purchaseId);
+      const isTeamPurchase = seatCounts.seats > 0;
+
+      if (seatCounts.claimed > 0) {
+        throw data(
+          "A Seat of this Team Purchase has been claimed since the Refund Request was made, so it can no longer be refunded. Decline it instead.",
+          { status: 409 }
+        );
+      }
+
       db.update(refunds)
         .set({
           status: RefundStatus.Approved,
@@ -105,7 +119,17 @@ export function resolveRefundRequest(
         .where(eq(refunds.id, refundRequestId))
         .run();
 
-      if (!isTeamPurchase(request.purchaseId)) {
+      if (isTeamPurchase) {
+        db.update(coupons)
+          .set({ cancelledAt: resolvedAt })
+          .where(
+            and(
+              eq(coupons.purchaseId, request.purchaseId),
+              isNull(coupons.cancelledAt)
+            )
+          )
+          .run();
+      } else {
         db.delete(enrollments)
           .where(
             and(

@@ -60,6 +60,7 @@ interface SeatRow {
   courseId: number;
   courseTitle: string;
   claimedByEmail: string | null;
+  cancelled: boolean;
   createdAt: string;
 }
 
@@ -103,6 +104,9 @@ export async function loader({ request }: Route.LoaderArgs) {
   >();
 
   for (const seat of allSeats) {
+    // A cancelled Seat was refunded; it is neither claimed nor unclaimed.
+    if (seat.cancelledAt !== null) continue;
+
     let entry = courseMap.get(seat.courseId);
     if (!entry) {
       const course = getCourseById(seat.courseId);
@@ -145,6 +149,7 @@ export async function loader({ request }: Route.LoaderArgs) {
       courseId: seat.courseId,
       courseTitle: course?.title ?? "Unknown Course",
       claimedByEmail,
+      cancelled: seat.cancelledAt !== null,
       createdAt: seat.createdAt,
     };
   });
@@ -297,7 +302,11 @@ export default function Team({ loaderData }: Route.ComponentProps) {
                       {seat.courseTitle}
                     </td>
                     <td className="px-4 py-3">
-                      {seat.claimedByEmail ? (
+                      {seat.cancelled ? (
+                        <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                          Cancelled
+                        </span>
+                      ) : seat.claimedByEmail ? (
                         <span className="text-muted-foreground">
                           Claimed by {seat.claimedByEmail}
                         </span>
@@ -308,7 +317,7 @@ export default function Team({ loaderData }: Route.ComponentProps) {
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      {!seat.claimedByEmail && (
+                      {!seat.claimedByEmail && !seat.cancelled && (
                         <CopySeatLinkButton code={seat.code} />
                       )}
                     </td>
